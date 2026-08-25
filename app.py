@@ -123,7 +123,10 @@ selected_date = st.sidebar.selectbox(
     ["All"] + available_dates,
     key="selected_date"
 )
-df["date"] = pd.to_datetime(df["date"], errors="coerce")
+filtered_df["date"] = pd.to_datetime(
+    filtered_df["date"], errors="coerce"
+)
+
 if selected_date != "All":
     filtered_df = filtered_df[
         filtered_df["date"].dt.date == selected_date
