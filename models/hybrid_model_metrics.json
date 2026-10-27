@@ -1,0 +1,98 @@
+[
+  {
+    "model": "universal_electricity",
+    "rows": 4900,
+    "mae": 2.3216,
+    "r2": 0.9209
+  },
+  {
+    "model": "universal_water",
+    "rows": 4900,
+    "mae": 12.5119,
+    "r2": 0.9483
+  },
+  {
+    "model": "specialized_apartment_electricity",
+    "rows": 700,
+    "mae": 1.8748,
+    "r2": 0.8081
+  },
+  {
+    "model": "specialized_apartment_water",
+    "rows": 700,
+    "mae": 14.107,
+    "r2": 0.9111
+  },
+  {
+    "model": "specialized_college_electricity",
+    "rows": 700,
+    "mae": 1.5678,
+    "r2": 0.8248
+  },
+  {
+    "model": "specialized_college_water",
+    "rows": 700,
+    "mae": 6.8439,
+    "r2": 0.8322
+  },
+  {
+    "model": "specialized_factory_electricity",
+    "rows": 700,
+    "mae": 3.8763,
+    "r2": 0.7715
+  },
+  {
+    "model": "specialized_factory_water",
+    "rows": 700,
+    "mae": 6.9842,
+    "r2": 0.8377
+  },
+  {
+    "model": "specialized_home_electricity",
+    "rows": 700,
+    "mae": 0.2531,
+    "r2": 0.703
+  },
+  {
+    "model": "specialized_home_water",
+    "rows": 700,
+    "mae": 0.9763,
+    "r2": 0.8018
+  },
+  {
+    "model": "specialized_hospital_electricity",
+    "rows": 700,
+    "mae": 3.1861,
+    "r2": 0.7463
+  },
+  {
+    "model": "specialized_hospital_water",
+    "rows": 700,
+    "mae": 19.1379,
+    "r2": 0.815
+  },
+  {
+    "model": "specialized_hotel_electricity",
+    "rows": 700,
+    "mae": 2.7541,
+    "r2": 0.8002
+  },
+  {
+    "model": "specialized_hotel_water",
+    "rows": 700,
+    "mae": 33.0586,
+    "r2": 0.8951
+  },
+  {
+    "model": "specialized_office_electricity",
+    "rows": 700,
+    "mae": 2.6425,
+    "r2": 0.8118
+  },
+  {
+    "model": "specialized_office_water",
+    "rows": 700,
+    "mae": 4.9321,
+    "r2": 0.895
+  }
+]

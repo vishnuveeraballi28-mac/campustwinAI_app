@@ -9,7 +9,7 @@ from analytics import (
     hourly_analysis,
     daily_analysis
 )
-
+from prediction_engine import predict_resources
 st.set_page_config(
     page_title="CampusTwinAI",
     page_icon="🏫",
@@ -24,12 +24,7 @@ if "predicted_electricity" not in st.session_state:
 
 if "predicted_water" not in st.session_state:
     st.session_state.predicted_water = None
-from analytics import (
-    basic_summary,
-    location_analysis,
-    hourly_analysis,
-    daily_analysis
-)
+
 
 # =========================================================
 # PAGE CONFIGURATION
@@ -47,24 +42,9 @@ st.set_page_config(
 
 @st.cache_data
 def load_data():
-    return pd.read_csv("data/campus_data.csv")
-
-
-@st.cache_resource
-def load_models():
-    electricity_model = joblib.load(
-        "models/electricity_model.pkl"
-    )
-
-    water_model = joblib.load(
-        "models/water_model.pkl"
-    )
-
-    return electricity_model, water_model
-
+    return pd.read_csv("data/building_consumption.csv")
 
 df = load_data()
-electricity_model, water_model = load_models()
 
 # =========================================================
 # TITLE
@@ -86,63 +66,112 @@ st.write(
 # SIDEBAR
 # =========================================================
 
-st.sidebar.title("🎛️ Campus Controls")
+st.sidebar.title("🏢 Building Controls")
 
+selected_building_type = st.sidebar.selectbox(
+    "Select Building Type",
+    [
+        "College",
+        "Hospital",
+        "Home",
+        "Apartment",
+        "Office",
+        "Hotel",
+        "Factory"
+    ],
+    key="sidebar_building_type"
+)
+
+building_locations = {
+    "College": ["Engineering Block", "Library", "Admin Block"],
+    "Hospital": ["Emergency Ward", "ICU", "General Ward"],
+    "Home": ["Living Room", "Bedroom", "Kitchen"],
+    "Apartment": ["Living Room", "Bedroom", "Kitchen"],
+    "Office": ["Office Floor", "Meeting Room", "Server Room"],
+    "Hotel": ["Guest Room", "Kitchen", "Lobby"],
+    "Factory": ["Production Floor", "Warehouse", "Office"]
+}
+building_locations = {
+    building: ["All"] + sorted(
+        df.loc[df["building_type"] == building, "location"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+    for building in df["building_type"].dropna().unique()
+}
 selected_location = st.sidebar.selectbox(
-    "Select Campus Location",
-    ["All"] + sorted(
-        df["location"].dropna().unique().tolist()
-    ),
+    "Select Location",
+    ["All"] + building_locations[selected_building_type],
     key="sidebar_location"
 )
 
 # =========================================================
 # FILTER DATA
 # =========================================================
+filtered_df = df[
+    df["building_type"] == selected_building_type
+].copy()
 
-if selected_location == "All":
-    filtered_df = df.copy()
-else:
-    filtered_df = df[
-        df["location"] == selected_location
-    ]
-# =========================================================
+if selected_location != "All":
+    filtered_df = filtered_df[
+        filtered_df["location"] == selected_location
+    ].copy()
 # DATE FILTER
-# =========================================================
-
 st.sidebar.subheader("📅 Date Filter")
 
-df["date"] = pd.to_datetime(df["date"],
-errors="coerce")
-available_dates = sorted(
-    df["date"].dt.date.unique()
-)
+if "date" in df.columns:
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    available_dates = sorted(df["date"].dropna().dt.date.unique())
 
-selected_date = st.sidebar.selectbox(
-    "Select Date",
-    ["All"] + available_dates,
-    key="selected_date"
-)
-filtered_df["date"] = pd.to_datetime(
-    filtered_df["date"], errors="coerce"
-)
+    if available_dates:
+        selected_date = st.sidebar.selectbox(
+            "Select Date",
+            ["All"] + available_dates,
+            key="selected_date"
+        )
 
-if selected_date != "All":
-    filtered_df = filtered_df[
-        filtered_df["date"].dt.date == selected_date
-    ]
+        if selected_date != "All":
+            filtered_df = filtered_df[
+                pd.to_datetime(
+                    filtered_df["date"], errors="coerce"
+                ).dt.date == selected_date
+            ]
+    else:
+        st.sidebar.info("No valid dates are available.")
+else:
+    st.sidebar.info(
+        "Date filtering is unavailable for this dataset."
+    )
 # =========================================================
 # SUMMARY
 # =========================================================
 
-summary = basic_summary(filtered_df)
+summary = {
+    "Total Electricity": pd.to_numeric(
+        filtered_df["electricity"], errors="coerce"
+    ).sum(),
+    "Total Water": pd.to_numeric(
+        filtered_df["water"], errors="coerce"
+    ).sum(),
+    "Electricity Cost": pd.to_numeric(
+        filtered_df["electricity"], errors="coerce"
+    ).sum() * 8,
+    "Water Cost": pd.to_numeric(
+        filtered_df["water"], errors="coerce"
+    ).sum() * 0.05,
+}
 # =========================================================
 # DASHBOARD KPIs
 # =========================================================
 
 st.header("📊 Campus Dashboard")
 
-avg_occupancy = filtered_df["occupancy"].mean()
+avg_occupancy = (
+    pd.to_numeric(filtered_df["occupancy"], errors="coerce").mean()
+    if "occupancy" in filtered_df.columns and not filtered_df.empty
+    else 0
+)
 
 dashboard_col1, dashboard_col2, dashboard_col3, dashboard_col4 = st.columns(4)
 
@@ -346,31 +375,29 @@ peak_df = (
     .reset_index()
 )
 
-peak_row = peak_df.loc[
-    peak_df["electricity"].idxmax()
-]
-
-peak_hour = int(peak_row["hour"])
-peak_electricity = peak_row["electricity"]
-
-peak_col1, peak_col2, peak_col3 = st.columns(3)
-
-with peak_col1:
-    st.metric(
-        "🔥 Peak Usage Hour",
-        f"{peak_hour}:00"
-    )
-
-with peak_col2:
-    st.metric(
-        "⚡ Peak Electricity",
-        f"{peak_electricity:.2f}"
-    )
-
-with peak_col3:
+if peak_df.empty:
     st.info(
-        "💡 Consider reducing AC usage during peak hours."
+        "No data available for Peak Usage Detection. "
+        "Please select a location with available data."
     )
+else:
+    peak_row = peak_df.loc[peak_df["electricity"].idxmax()]
+    peak_hour = int(peak_row["hour"])
+    peak_electricity = peak_row["electricity"]
+
+    peak_col1, peak_col2, peak_col3 = st.columns(3)
+
+    with peak_col1:
+        st.metric("🔥 Peak Usage Hour", f"{peak_hour}:00")
+
+    with peak_col2:
+        st.metric("⚡ Peak Electricity", f"{peak_electricity:.2f}")
+
+    with peak_col3:
+        st.metric(
+            "📊 Average Electricity",
+            f"{peak_df['electricity'].mean():.2f}"
+        )
 # =========================================================
 # HOURLY ANALYSIS
 # =========================================================
@@ -521,28 +548,63 @@ with pred_col1:
         key="prediction_day"
     )
 
-    prediction_location = st.selectbox(
-        "Location",
-        sorted(
-            df["location"].dropna().unique().tolist()
-        ),
-        key="prediction_location"
-    )
+    prediction_building_type = st.selectbox(
+    "Building Type",
+    ["College", "Hospital", "Home", "Apartment",
+     "Office", "Hotel", "Factory"],
+    index=0,
+    key="prediction_building_type_v2"
+)
+    building_locations = {
+    "College": ["Engineering Block", "Library", "Admin Block"],
+    "Hospital": ["Emergency Ward", "ICU", "General Ward"],
+    "Home": ["Living Room", "Bedroom", "Kitchen"],
+    "Apartment": ["Living Room", "Bedroom", "Kitchen"],
+    "Office": ["Office Floor", "Meeting Room", "Server Room"],
+    "Hotel": ["Guest Room", "Kitchen", "Lobby"],
+    "Factory": ["Production Floor", "Warehouse", "Office"]
+}
 
-    prediction_room = st.selectbox(
-        "Room",
-        sorted(
-            df["room"].dropna().unique().tolist()
-        ),
-        key="prediction_room"
-    )
+prediction_location = st.selectbox(
+    "Location",
+    building_locations[prediction_building_type],
+    key="prediction_location_v2"
+)
+building_rooms = {
+    "College": ["Classroom", "Laboratory", "Library"],
+    "Hospital": ["Patient Room", "ICU", "Operation Theatre"],
+    "Home": ["Living Room", "Bedroom", "Kitchen"],
+    "Apartment": ["Living Room", "Bedroom", "Kitchen"],
+    "Office": ["Meeting Room", "Workstation", "Server Room"],
+    "Hotel": ["Guest Room", "Kitchen", "Lobby"],
+    "Factory": ["Production Area", "Warehouse", "Office"]
+}
 
+prediction_room = st.selectbox(
+    "Room",
+    building_rooms[prediction_building_type],
+    key="prediction_room_v2"
+)
 # =========================================================
 # RIGHT SIDE INPUTS
 # =========================================================
-
 with pred_col2:
+    prediction_floor_area = st.number_input(
+        "Floor Area (sq ft)",
+        min_value=100.0,
+        value=30000.0,
+        step=500.0,
+        key="prediction_floor_area"
+    )
 
+    prediction_operating_hours = st.number_input(
+        "Operating Hours per Day",
+        min_value=1.0,
+        max_value=24.0,
+        value=10.0,
+        step=1.0,
+        key="prediction_operating_hours"
+    )
     prediction_occupancy = st.number_input(
         "Occupancy / Number of People",
         min_value=0,
@@ -592,83 +654,108 @@ prediction_weekend = (
 # =========================================================
 
 prediction_input = pd.DataFrame({
+    "building_type": [prediction_building_type],
+    "location": [prediction_location],
+    "room": [prediction_room],
     "hour": [prediction_hour],
     "minute": [prediction_minute],
     "day_of_week": [prediction_day],
-    "location": [prediction_location],
-    "room": [prediction_room],
     "weekend": [prediction_weekend],
     "holiday": [int(prediction_holiday)],
     "event": [int(prediction_event)],
     "occupancy": [prediction_occupancy],
     "temperature": [prediction_temperature],
-    "ac_hours": [prediction_ac_hours]
+    "ac_hours": [prediction_ac_hours],
+    "floor_area_sqft": [prediction_floor_area],
+    "operating_hours": [prediction_operating_hours]
 })
 
-# =========================================================
+# ==========================================
 # GENERATE AI PREDICTION
-# =========================================================
+# ==========================================
 
 if st.button(
     "🔮 Generate AI Prediction",
     key="generate_ai_prediction"
 ):
-
     try:
-
-        # -------------------------------------------------
         # AI MODEL PREDICTION
-        # -------------------------------------------------
+        prediction_result = predict_resources(
+                prediction_input.iloc[0].to_dict()
+            )
 
-        predicted_electricity = electricity_model.predict(
-            prediction_input
-        )[0]
+        predicted_electricity = prediction_result["predicted_electricity"]
+        predicted_water = prediction_result["predicted_water"]
 
-        predicted_water = water_model.predict(
-            prediction_input
-        )[0]
+        # ESTIMATED RESOURCE COST
+        electricity_rate = 8.0
+        water_rate = 0.05
+
+        estimated_electricity_cost = float(
+        predicted_electricity
+        * electricity_rate
+        )
+        estimated_water_cost = float(
+        predicted_water
+        * water_rate
+        )
         # SAVE PREDICTION HISTORY
-        
         st.session_state.prediction_history.append({
-    "Location": prediction_location,
-    "Room": prediction_room,
-    "Occupancy": prediction_occupancy,
-    "Temperature": prediction_temperature,
-    "AC Hours": prediction_ac_hours,
-    "Predicted Electricity": round(predicted_electricity, 2),
-    "Predicted Water": round(predicted_water, 2)
-})
+            "Location": prediction_location,
+            "Room": prediction_room,
+            "Occupancy": prediction_occupancy,
+            "Temperature": prediction_temperature,
+            "AC Hours": prediction_ac_hours,
+            "Predicted Electricity": round(
+                predicted_electricity, 2
+            ),
+            "Predicted Water": round(
+                predicted_water, 2
+            ),
+            "Electricity Cost": round(
+                estimated_electricity_cost, 2
+            ),
+            "Water Cost": round(
+                estimated_water_cost, 2
+            )
+        })
+
+        # SAVE LATEST PREDICTION
         st.session_state.predicted_electricity = predicted_electricity
         st.session_state.predicted_water = predicted_water
-        # -------------------------------------------------
+
         # SUCCESS MESSAGE
-        # -------------------------------------------------
+        st.success("✅ AI Prediction Generated Successfully!")
 
-        st.success(
-            "✅ AI Prediction Generated Successfully!"
-        )
-
-        # -------------------------------------------------
-        # PREDICTION RESULT
-        # -------------------------------------------------
-
+        # PREDICTION RESULTS
         st.subheader("🔮 AI Prediction Result")
 
         result_col1, result_col2 = st.columns(2)
 
         with result_col1:
-
             st.metric(
                 "⚡ Predicted Electricity",
                 f"{predicted_electricity:.2f}"
             )
 
-        with result_col2:
+            st.metric(
+                "💰 Electricity Cost",
+                f"₹{estimated_electricity_cost:.2f}"
+            )
 
+        with result_col2:
             st.metric(
                 "💧 Predicted Water",
                 f"{predicted_water:.2f}"
             )
+
+            st.metric(
+                "💰 Water Cost",
+                f"₹{estimated_water_cost:.2f}"
+            )
+
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
 
         # -------------------------------------------------
         # PREDICTION ANALYSIS
@@ -1027,13 +1114,29 @@ st.download_button(
 # DATA TABLE
 # =========================================================
 
-st.header("📊 Campus Dataset")
+st.header("🏢 Multi-Building Dataset")
 
-st.dataframe(
-    filtered_df.head(100),
-    width="stretch"
-)
+import os
+import pandas as pd
 
+building_data_path = "data/building_consumption.csv"
+
+if os.path.exists(building_data_path):
+    building_df = pd.read_csv(building_data_path)
+
+    st.caption(
+        "Demo data: synthetic values for testing, "
+        "not real building measurements."
+    )
+
+    st.metric("Total Records", len(building_df))
+
+    st.dataframe(
+        building_df.head(100),
+        width="stretch"
+    )
+else:
+    st.warning("Building dataset file was not found.")
 # =========================================================
 # FOOTER
 # =========================================================
