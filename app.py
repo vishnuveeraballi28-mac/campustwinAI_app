@@ -30,12 +30,30 @@ if "predicted_water" not in st.session_state:
 # PAGE CONFIGURATION
 # =========================================================
 
-st.set_page_config(
-    page_title="CampusTwinAI",
-    page_icon="🏫",
-    layout="wide"
-)
+st.markdown("""
+<style>
+.block-container {
+    padding: 1rem;
+    max-width: 100%;
+}
 
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+    width: 100%;
+    overflow-x: auto;
+}
+
+h1, h2, h3 {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+    .block-container {
+        padding: 0.6rem;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
 # =========================================================
 # LOAD DATA
 # =========================================================
