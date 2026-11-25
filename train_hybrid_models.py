@@ -7,7 +7,11 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
+)
 
 DATA = Path("data/building_consumption.csv")
 MODEL_DIR = Path("models")
@@ -57,10 +61,11 @@ def fit_model(df, target, path, label):
     model.fit(X_train, y_train)
     pred = model.predict(X_test)
     result = {
-        "model": label,
-        "rows": int(len(data)),
-        "mae": round(float(mean_absolute_error(y_test, pred)), 4),
-        "r2": round(float(r2_score(y_test, pred)), 4)
+    "model": label,
+    "rows": int(len(data)),
+    "mae": round(float(mean_absolute_error(y_test, pred)), 4),
+    "rmse": round(float(mean_squared_error(y_test, pred) ** 0.5), 4),
+    "r2": round(float(r2_score(y_test, pred)), 4)
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, path)

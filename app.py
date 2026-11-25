@@ -838,7 +838,8 @@ if st.button(
             predicted_electricity
             * electricity_rate
         )
-
+        st.session_state["estimated_electricity_cost"] = estimated_electricity_cost
+        st.session_state["estimated_water_cost"] = estimated_water_cost
         estimated_water_cost = (
             predicted_water
             * water_rate
@@ -1094,8 +1095,8 @@ Predicted Water       : {predicted_water:.2f}
 
 ESTIMATED COST
 --------------
-Electricity Cost : ₹{estimated_electricity_cost:.2f}
-Water Cost       : ₹{estimated_water_cost:.2f}
+Electricity Cost : ₹{st.session_state.get('estimated_electricity_cost', 0.0):.2f}
+Water Cost       : ₹{st.session_state.get('estimated_water_cost', 0.0):.2f}
 RESOURCE SAVINGS
 ----------------
 Electricity Saved : {electricity_saved:.2f}
