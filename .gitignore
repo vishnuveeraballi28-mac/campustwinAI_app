@@ -1,1 +1,3 @@
-node_modules/ # adjust for your project type
+.DS_Store
+__pycache__/
+*.py[cod]
